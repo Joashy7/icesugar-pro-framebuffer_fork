@@ -28,7 +28,8 @@ module icesugar_pro_lcd_fb (
     // CPU/GPU Write Interface (To draw to the screen)
     input  wire        wr_en,
     input  wire [23:0] wr_addr,       
-    input  wire [15:0] wr_data
+    input  wire [15:0] wr_data,
+    output wire        wr_ack,
 );
 
     wire clk_sys;     // 100 MHz for SDRAM
@@ -152,6 +153,7 @@ module icesugar_pro_lcd_fb (
         .wr_req(wr_en),
         .wr_addr(wr_addr),
         .wr_data(wr_data),
+        .wr_ack(wr_ack),
         
         .rd_req(rd_req),
         .rd_addr(sdram_rd_addr),   // Continuous address stream
