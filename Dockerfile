@@ -4,9 +4,7 @@ FROM ubuntu:24.04
 RUN apt upgrade && apt update
 
 # Get HW build tools
-RUN apt-get update && apt-get install -y yosys nextpnr-ecp5 fpga-icestorm iverilog git
-RUN apt-get update && apt-get install -y fpga-trellis fpga-trellis-database
-RUN apt-get update && apt-get install -y libusb-1.0-0-dev pkg-config
+RUN apt-get update && apt-get install -y yosys nextpnr-ecp5 fpga-icestorm iverilog git fpga-trellis fpga-trellis-database libusb-1.0-0-dev pkg-config
 
 # Get SW build tools & PICO SDK
 RUN apt-get update && apt-get install -y openocd gdb-multiarch
