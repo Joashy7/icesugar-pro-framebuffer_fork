@@ -1,8 +1,6 @@
-
 #include "spi_display.h"
 #include "lv_conf.h"
-#include "lvgl_demo_widgets.h"
-#include "lvgl_touch.h"
+#include "lvgl_example_grid.h"
 
 #include <lvgl.h>
 
@@ -57,13 +55,13 @@ int main(void) {
     // Init drivers
 	stdio_init_all();
 	cyw43_arch_init();
-    adc_init();
 
     ucr::bcoe::SPIDisplay spi_display(480, 272, 10000000, 20);
 	spi_display.begin();
 	spi_display.clear();
 
-    ucr::bcoe::cs::cs122::LVGL_DemoWidgets app(&spi_display, cs122_flush_cb_partial, cs122_get_millis);
-    touch_init(26, 21, 27, 22);
+    static uint8_t board[10][10] = {0};
+
+    ucr::bcoe::cs::cs122::LVGL_Example_Grid app(&spi_display, cs122_flush_cb_partial, cs122_get_millis);
     app.run();
 }

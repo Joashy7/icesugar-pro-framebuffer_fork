@@ -1,11 +1,10 @@
-#ifndef _LVGL_CLOCK_H_
-#define _LVGL_CLOCK_H_
+#ifndef _LVGL_EXAMPLE_GRID_H_
+#define _LVGL_EXAMPLE_GRID_H_
         
-#include "demos/lv_demos.h"
 #include <cs122_app.h>
 
 namespace ucr { namespace bcoe { namespace cs { namespace cs122 {
-    class LVGL_DemoWidgets : CS122_App {
+    class LVGL_Example_Grid : CS122_App {
     public:
         using CS122_App::CS122_App;
         virtual uint32_t run();                        
@@ -13,3 +12,4 @@ namespace ucr { namespace bcoe { namespace cs { namespace cs122 {
 }}}}
 
 #endif
+
