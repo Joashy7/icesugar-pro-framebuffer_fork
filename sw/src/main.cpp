@@ -65,7 +65,7 @@ void DisplayCurrentState() {
             DisplayWithShips(player);
             break;
         case PLAY:
-            DisplayWithoutShips(player);
+            DisplayWithoutShips(!player);
             break;
         default:
             DisplayWithShips(player);
@@ -97,8 +97,7 @@ void Tick() {
         case POSITION:
             switch (placeState) {
                 case PLACE_START:
-                    xOffset = 0;
-                    yOffset = OFFSETS[0];
+                    LoadCurrentShipSize(player);
                     MoveCursor(player);
                     placeState = PLACE_IDLE;
                     break;
@@ -114,8 +113,8 @@ void Tick() {
                     } else if (!direction && !rotate && place) {
                         placeState = PLACE;
                         SetCell();
-                        if (playerIndex[player] < sizeof(OFFSETS)/sizeof(OFFSETS[0])) MoveCursor(player);
-                    } else if (playerIndex[player] >= sizeof(OFFSETS)/sizeof(OFFSETS[0])) {                       
+                        if (ShipsRemaining(player)) MoveCursor(player);
+                    } else if (!ShipsRemaining(player)) {                       
                         placeState = READY;
                     }
                     break;
@@ -146,7 +145,7 @@ void Tick() {
 
                         modeState = PLAY;
 
-                        MoveCursor(player);
+                        MoveCursor(!player);
                         RequestDisplayUpdate();
                     }
                     break;

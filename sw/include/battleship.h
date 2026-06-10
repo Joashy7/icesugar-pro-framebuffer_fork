@@ -17,7 +17,7 @@ enum playStates {PLAY_START, PLAY_IDLE, PLAY_MOVE, ATTACK, WON} playState;
 
 cell playerBoard[2][ROWS][COLUMNS] = {};
 
-const int OFFSETS[] = {4, 3, 2, 2, 1};
+const int OFFSETS[5] = {4, 3, 2, 2, 1};
 int x = 0, y = 0, xOffset = 0, yOffset = OFFSETS[0], playerIndex[2] = {0, 0};
 unsigned int VRx, VRy;
 bool player = 0, rotate, place;
@@ -32,6 +32,25 @@ bool ConsumeDisplayUpdate() {
     bool shouldUpdate = displayDirty;
     displayDirty = false;
     return shouldUpdate;
+}
+
+int ShipCount() {
+    return sizeof(OFFSETS)/sizeof(OFFSETS[0]);
+}
+
+bool ShipsRemaining(bool boardIndex) {
+    return playerIndex[boardIndex] < ShipCount();
+}
+
+void LoadCurrentShipSize(bool boardIndex) {
+    if (!ShipsRemaining(boardIndex)) {
+        xOffset = 0;
+        yOffset = 0;
+        return;
+    }
+
+    xOffset = 0;
+    yOffset = OFFSETS[playerIndex[boardIndex]];
 }
 
 bool GetDirections() {
@@ -79,6 +98,16 @@ void MoveCursor(bool boardIndex) {
     RequestDisplayUpdate();
 }
 
+void ClearCursor(bool boardIndex) {
+    for (int row = 0; row < ROWS; row++) {
+        for (int col = 0; col < COLUMNS; col++) {
+            playerBoard[boardIndex][row][col].cursor = false;
+        }
+    }
+    x = 0; y = 0;
+    RequestDisplayUpdate();
+}
+
 bool GetPress() {
     bool nextPlace = gpio_get(21);
     bool nextRotate = gpio_get(22);
@@ -97,11 +126,7 @@ bool GetPress() {
     return changed;
 }
 
-void ResetCursor() {
-    playerBoard[player][y][x].cursor = false;
-    x = 0; y = 0;
-    RequestDisplayUpdate();
-}
+
 
 void PrintBoard(int boardIndex) {
     printf("\nBoard %d\n", boardIndex);
@@ -131,29 +156,31 @@ void SetCell() {
     }
 
     playerIndex[player]++;
-    ResetCursor();
+    ClearCursor(player);
 
-    if (playerIndex[player] >= sizeof(OFFSETS)/sizeof(OFFSETS[0])) {
-        xOffset = 0;
-        yOffset = 0;
-    }
+    LoadCurrentShipSize(player);
 
     RequestDisplayUpdate();
 }
 
 void Attack() {
-    if (playerBoard[!player][y][x].value == HIT || playerBoard[!player][y][x].value == MISS) return;
+    int target = !player;
 
-    if (playerBoard[!player][y][x].value == EMPTY) {
-        playerBoard[!player][y][x].value = MISS;
+    if (playerBoard[target][y][x].value == HIT || playerBoard[target][y][x].value == MISS) {
+        ClearCursor(target);
+        return;
+    }
+
+    if (playerBoard[target][y][x].value == EMPTY) {
+        playerBoard[target][y][x].value = MISS;
         gpio_put(18, 0);
     }
-    else if (playerBoard[!player][y][x].value == PLACED) {
-        playerBoard[!player][y][x].value = HIT;
+    else if (playerBoard[target][y][x].value == PLACED) {
+        playerBoard[target][y][x].value = HIT;
         gpio_put(18, 1);
     }
-    x = 0; y = 0;
-    RequestDisplayUpdate();
+
+    ClearCursor(target);
 }
 
 bool CheckForWinner(int boardIndex) {
