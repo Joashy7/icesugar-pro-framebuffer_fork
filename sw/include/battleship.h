@@ -21,21 +21,44 @@ const int OFFSETS[] = {4, 3, 2, 2, 1};
 int x = 0, y = 0, xOffset = 0, yOffset = OFFSETS[0], playerIndex[2] = {0, 0};
 unsigned int VRx, VRy;
 bool player = 0, rotate, place;
+bool displayDirty = true;
+bool debugInput = true;
 
-void GetDirections() {
+void RequestDisplayUpdate() {
+    displayDirty = true;
+}
+
+bool ConsumeDisplayUpdate() {
+    bool shouldUpdate = displayDirty;
+    displayDirty = false;
+    return shouldUpdate;
+}
+
+bool GetDirections() {
     adc_select_input(0); 
     VRx = adc_read();
 
     adc_select_input(1); 
     VRy = adc_read();
 
-    if (VRy > 2500 && VRx > 250 && VRx < 2500) direction = UP;
-    else if (VRy < 250 && VRx > 250 && VRx < 2500) direction = DOWN;
-    else if (VRx < 250 && VRy > 250 && VRy < 2500) direction = LEFT;
-    else if (VRx > 2500 && VRy > 250 && VRy < 2500) direction = RIGHT;
-    else direction = REST;
+    directions nextDirection = REST;
 
-    printf("VRx: %d, VRy: %d, Direction: %d\n", VRx, VRy, direction);
+    if (VRy > 2500 && VRx > 250 && VRx < 2500) nextDirection = UP;
+    else if (VRy < 250 && VRx > 250 && VRx < 2500) nextDirection = DOWN;
+    else if (VRx < 250 && VRy > 250 && VRy < 2500) nextDirection = LEFT;
+    else if (VRx > 2500 && VRy > 250 && VRy < 2500) nextDirection = RIGHT;
+
+    bool changed = nextDirection != direction;
+    direction = nextDirection;
+
+    if (changed) {
+        RequestDisplayUpdate();
+        if (debugInput) {
+            printf("Direction changed: %d\n", direction);
+        }
+    }
+
+    return changed;
 }
 
 void MoveCursor(bool boardIndex) {
@@ -52,18 +75,32 @@ void MoveCursor(bool boardIndex) {
     for (int i = 0; i <= xOffset; i++) {
         for (int j = 0; j <= yOffset; j++) playerBoard[boardIndex][y + j][x + i].cursor = true;
     }
+
+    RequestDisplayUpdate();
 }
 
-void GetPress() {
-    place = gpio_get(21);
-    rotate = gpio_get(22);
+bool GetPress() {
+    bool nextPlace = gpio_get(21);
+    bool nextRotate = gpio_get(22);
+    bool changed = nextPlace != place || nextRotate != rotate;
 
-    printf("Place: %d, Rotate: %d\n", place, rotate);
+    place = nextPlace;
+    rotate = nextRotate;
+
+    if (changed) {
+        RequestDisplayUpdate();
+        if (debugInput) {
+            printf("Buttons changed: place=%d rotate=%d\n", place, rotate);
+        }
+    }
+
+    return changed;
 }
 
 void ResetCursor() {
     playerBoard[player][y][x].cursor = false;
     x = 0; y = 0;
+    RequestDisplayUpdate();
 }
 
 void PrintBoard(int boardIndex) {
@@ -94,13 +131,14 @@ void SetCell() {
     }
 
     playerIndex[player]++;
-    PrintBoard(player);
     ResetCursor();
 
-    if (playerIndex[player] >= sizeof(OFFSETS)) {
+    if (playerIndex[player] >= sizeof(OFFSETS)/sizeof(OFFSETS[0])) {
         xOffset = 0;
         yOffset = 0;
     }
+
+    RequestDisplayUpdate();
 }
 
 void Attack() {
@@ -115,6 +153,7 @@ void Attack() {
         gpio_put(18, 1);
     }
     x = 0; y = 0;
+    RequestDisplayUpdate();
 }
 
 bool CheckForWinner(int boardIndex) {
@@ -140,4 +179,6 @@ void RotateShip() {
     for (int i = 0; i <= xOffset; i++) {
         for (int j = 0; j <= yOffset; j++) playerBoard[player][y + j][x + i].cursor = true;
     }
+
+    RequestDisplayUpdate();
 }

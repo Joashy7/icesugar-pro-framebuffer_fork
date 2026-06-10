@@ -55,20 +55,37 @@ void DisplayWithoutShips(bool p) {
     app->DisplayWithoutShips(playerBoard[p]);
 }
 
-bool Tick(struct repeating_timer *t) {
+void DisplayCurrentState() {
+    switch (modeState) {
+        case WAIT:
+            if (place) DisplayWithoutShips(player);
+            else DisplayWithShips(player);
+            break;
+        case POSITION:
+            DisplayWithShips(player);
+            break;
+        case PLAY:
+            DisplayWithoutShips(player);
+            break;
+        default:
+            DisplayWithShips(player);
+            break;
+    }
+}
+
+void Tick() {
 
     switch (modeState) {
         case MODE_START:
             modeState = WAIT;
             if (!player) gpio_put(18, 1);
             else gpio_put(16, 1);
+            RequestDisplayUpdate();
             break;
         case WAIT:
-            DisplayWithShips(player);
             GetPress();
             if (place) {
-                //modeState = PUSH;
-                DisplayWithoutShips(player);
+                modeState = PUSH;
             }
             break;
         case PUSH:
@@ -120,6 +137,7 @@ bool Tick(struct repeating_timer *t) {
                         modeState = MODE_START;
                         placeState = PLACE_START;
                         gpio_put(18, 0);
+                        RequestDisplayUpdate();
                     } else {
                         player = 0;
                         x = 0;
@@ -129,7 +147,7 @@ bool Tick(struct repeating_timer *t) {
                         modeState = PLAY;
 
                         MoveCursor(player);
-                        PrintBoard(1);
+                        RequestDisplayUpdate();
                     }
                     break;
                 default:
@@ -146,7 +164,6 @@ bool Tick(struct repeating_timer *t) {
                     xOffset = 0;
                     yOffset = 0;
                     MoveCursor(!player);
-                    DisplayWithoutShips(!player);
                     playState = PLAY_IDLE;
                     break;
                 case PLAY_IDLE:
@@ -186,14 +203,21 @@ bool Tick(struct repeating_timer *t) {
                     playState = PLAY_START;
                     break;
             }
-            DisplayWithoutShips(player);
             break;
         default:
             modeState = MODE_START;
             break;
     }
 
-    return true;
+    if (ConsumeDisplayUpdate()) {
+        printf("Display update: mode=%d placeState=%d playState=%d player=%d place=%d direction=%d\n",
+               modeState, placeState, playState, player, place, direction);
+        DisplayCurrentState();
+    }
+}
+
+void TickTimerCallback(lv_timer_t *timer) {
+    Tick();
 }
 
 int main(void) {
@@ -224,11 +248,7 @@ int main(void) {
 
     app = &grid_app;
 
-    struct repeating_timer timer;
-    add_repeating_timer_ms(-100, Tick, NULL, &timer);
+    lv_timer_create(TickTimerCallback, 20, NULL);
     return grid_app.run();
 
-    sleep_ms(2000);
-
-    
 }

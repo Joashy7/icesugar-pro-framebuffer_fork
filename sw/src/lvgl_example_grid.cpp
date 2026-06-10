@@ -102,22 +102,20 @@ LVGL_Example_Grid::LVGL_Example_Grid(SPIDisplay *spi_disp,
         for(int row = 0; row < ROWS; row++) {
             for(int col = 0; col < COLUMNS; col++) {
                 lv_obj_t * cell_obj = cells_[row][col];
-                
-                if (hideShips) {
-                    lv_obj_set_style_bg_color(cell_obj, lv_color_hex(0x0000FF), 0);
-                } else {
-                    lv_obj_set_style_bg_color(cell_obj, lv_color_hex(0xFF0000), 0);
+
+                uint32_t color = 0x0000FF;
+
+                if (!hideShips && board[row][col].value == PLACED) {
+                    color = 0xFF0000;
                 }
                 if (board[row][col].value == HIT) {
-                    lv_obj_set_style_bg_color(cell_obj, lv_color_hex(0xFF0000), 0);
+                    color = 0xFF0000;
                 }
                 else if (board[row][col].value == MISS) {
-                    lv_obj_set_style_bg_color(cell_obj, lv_color_hex(0x00FF00), 0);
+                    color = 0x00FF00;
                 }
-                else if (board[row][col].value == EMPTY) {
-                    lv_obj_set_style_bg_color(cell_obj, lv_color_hex(0x0000FF), 0);
-                }
-                lv_obj_invalidate(cell_obj);
+
+                lv_obj_set_style_bg_color(cell_obj, lv_color_hex(color), 0);
 
                 if (board[row][col].cursor) {
                     lv_obj_set_style_border_color(cell_obj, lv_color_hex(0xFFFF00), 0);
@@ -163,7 +161,7 @@ LVGL_Example_Grid::LVGL_Example_Grid(SPIDisplay *spi_disp,
         createGrid();
         renderBoard(board_, false);
 
-        lv_timer_create(redrawTimerCallback, 30, this);
+        lv_timer_create(redrawTimerCallback, 10, this);
 
         return loop();
     }
