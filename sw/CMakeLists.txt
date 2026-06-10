@@ -1,12 +1,11 @@
-set(CONFIG_LV_BUILD_EXAMPLES ON)
-set(CONFIG_LV_BUILD_DEMOS ON)
-set(LV_BUILD_CONF_PATH ${CMAKE_CURRENT_SOURCE_DIR}/include/lv_conf.h)
-
+set(CONFIG_LV_BUILD_EXAMPLES OFF CACHE BOOL "Build LVGL examples" FORCE)
+set(CONFIG_LV_BUILD_DEMOS OFF CACHE BOOL "Build LVGL demos" FORCE)
+set(CONFIG_LV_USE_THORVG_INTERNAL OFF CACHE BOOL "Use internal ThorVG" FORCE)
+set(LV_BUILD_CONF_PATH ${CMAKE_CURRENT_SOURCE_DIR}/include/lv_conf.h CACHE PATH "LVGL config" FORCE)
 add_subdirectory(lvgl)
 
 include_directories(include)
 include_directories(lvgl)
-include_directories(lvgl/examples)
 
 add_custom_target(sw ALL
      DEPENDS
@@ -21,8 +20,11 @@ add_executable(cs122_demo
      src/lvgl_example_grid.cpp
 )
 
+pico_enable_stdio_usb(cs122_demo 1)
+
 # pull in common dependencies and additional spi hardware support
-target_link_libraries(cs122_demo pico_stdlib hardware_spi hardware_adc pico_cyw43_arch_none lvgl::lvgl lvgl::examples)
+target_link_libraries(cs122_demo pico_stdlib hardware_spi hardware_adc pico_cyw43_arch_none lvgl::lvgl)
 
 # create map/bin/hex file etc.
 pico_add_extra_outputs(cs122_demo)
+

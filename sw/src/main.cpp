@@ -1,15 +1,11 @@
 #include "spi_display.h"
 #include "lv_conf.h"
 #include "lvgl_example_grid.h"
+#include "battleship.h"
+#include <pico/stdio_usb.h>
 
-#include <lvgl.h>
-
-#include <stdio.h>
-#include <pico/stdlib.h>
-#include <pico/binary_info.h>
-#include <pico/time.h>
-#include <hardware/spi.h>
-#include <pico/cyw43_arch.h>
+ucr::bcoe::SPIDisplay spi_display(480, 272, 10000000, 20);
+static ucr::bcoe::cs::cs122::LVGL_Example_Grid *app = nullptr;
 
 /*Return the elapsed milliseconds since startup.
  *It needs to be implemented by the user*/
@@ -51,17 +47,188 @@ void cs122_flush_cb_partial(lv_display_t * disp, const lv_area_t * area, uint8_t
     lv_display_flush_ready(disp);
 }
 
+void DisplayWithShips(bool p) {
+    app->DisplayWithShips(playerBoard[p]);
+}
+
+void DisplayWithoutShips(bool p) {
+    app->DisplayWithoutShips(playerBoard[p]);
+}
+
+bool Tick(struct repeating_timer *t) {
+
+    switch (modeState) {
+        case MODE_START:
+            modeState = WAIT;
+            if (!player) gpio_put(18, 1);
+            else gpio_put(16, 1);
+            break;
+        case WAIT:
+            DisplayWithShips(player);
+            GetPress();
+            if (place) {
+                //modeState = PUSH;
+                DisplayWithoutShips(player);
+            }
+            break;
+        case PUSH:
+            GetPress();
+            if (!place) {
+                modeState = POSITION;
+            }
+            break;
+        case POSITION:
+            switch (placeState) {
+                case PLACE_START:
+                    xOffset = 0;
+                    yOffset = OFFSETS[0];
+                    MoveCursor(player);
+                    placeState = PLACE_IDLE;
+                    break;
+                case PLACE_IDLE:
+                    GetDirections();
+                    GetPress();
+                    if(direction && !rotate && !place) {
+                        placeState = PLACE_MOVE;
+                        MoveCursor(player);
+                    } else if (!direction && rotate && !place) {
+                        placeState = ROTATE;
+                        RotateShip();
+                    } else if (!direction && !rotate && place) {
+                        placeState = PLACE;
+                        SetCell();
+                        if (playerIndex[player] < sizeof(OFFSETS)/sizeof(OFFSETS[0])) MoveCursor(player);
+                    } else if (playerIndex[player] >= sizeof(OFFSETS)/sizeof(OFFSETS[0])) {                       
+                        placeState = READY;
+                    }
+                    break;
+                case PLACE_MOVE:
+                    GetDirections();
+                    if (!direction) placeState = PLACE_IDLE;
+                    break;
+                case ROTATE:
+                    GetPress();
+                    if (!rotate) placeState = PLACE_IDLE;
+                    break;
+                case PLACE:
+                    GetPress();
+                    if (!place) placeState = PLACE_IDLE;
+                    break;
+                case READY:
+                    if (!player) {
+                        player = 1;
+                        modeState = MODE_START;
+                        placeState = PLACE_START;
+                        gpio_put(18, 0);
+                    } else {
+                        player = 0;
+                        x = 0;
+                        y = 0;
+
+
+                        modeState = PLAY;
+
+                        MoveCursor(player);
+                        PrintBoard(1);
+                    }
+                    break;
+                default:
+                    placeState = PLACE_START;
+                    break;
+            }
+            //DisplayWithShips(player);
+            break;
+        case PLAY:
+            gpio_put(16, player);    
+
+            switch(playState) {
+                case PLAY_START:
+                    xOffset = 0;
+                    yOffset = 0;
+                    MoveCursor(!player);
+                    DisplayWithoutShips(!player);
+                    playState = PLAY_IDLE;
+                    break;
+                case PLAY_IDLE:
+                    GetDirections();
+                    GetPress();
+                    if(direction && !place) {
+                        playState = PLAY_MOVE;
+                        MoveCursor(!player);
+                    } else if (!direction && place) {
+                        int target = !player;
+                        Attack();
+
+                        if (CheckForWinner(target)) {
+                            playState = WON;
+                        } else {
+                            playState = ATTACK;
+                            player = !player;
+                        }
+                    }
+                    break;
+                case PLAY_MOVE:
+                    GetDirections();
+                    if (!direction) playState = PLAY_IDLE;
+                    break;
+                case ATTACK:
+                    GetPress();
+                    if (!place) {
+                        MoveCursor(!player);
+                        playState = PLAY_IDLE;
+                    }
+                    break;
+                case WON:
+                    gpio_put(18, 0);
+                    //gpio_put(16, 0);
+                    break;
+                default:
+                    playState = PLAY_START;
+                    break;
+            }
+            DisplayWithoutShips(player);
+            break;
+        default:
+            modeState = MODE_START;
+            break;
+    }
+
+    return true;
+}
+
 int main(void) {
     // Init drivers
 	stdio_init_all();
+    adc_init();
 	cyw43_arch_init();
 
-    ucr::bcoe::SPIDisplay spi_display(480, 272, 10000000, 20);
+    adc_gpio_init(26);
+    adc_gpio_init(27);
+
+    gpio_init(22); gpio_set_dir(22, false); gpio_pull_down(22);
+    gpio_init(21); gpio_set_dir(21, false); gpio_pull_down(21);
+
 	spi_display.begin();
 	spi_display.clear();
 
-    static uint8_t board[10][10] = {0};
+    modeState = MODE_START;
+    placeState = PLACE_START;
+    playState = PLAY_START;
 
-    ucr::bcoe::cs::cs122::LVGL_Example_Grid app(&spi_display, cs122_flush_cb_partial, cs122_get_millis);
-    app.run();
+    static ucr::bcoe::cs::cs122::LVGL_Example_Grid grid_app(
+        &spi_display,
+        cs122_flush_cb_partial,
+        cs122_get_millis,
+        playerBoard[0]
+    );
+
+    app = &grid_app;
+
+    struct repeating_timer timer;
+    add_repeating_timer_ms(-100, Tick, NULL, &timer);
+    return grid_app.run();
+
+    sleep_ms(2000);
+
+    
 }
