@@ -9,6 +9,7 @@ typedef enum {EMPTY, PLACED, HIT, MISS} cellValue;
 typedef struct cell {
     cellValue value;
     bool cursor;
+    int id;
 } cell;
 
 #endif

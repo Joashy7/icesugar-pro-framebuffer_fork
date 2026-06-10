@@ -14,46 +14,7 @@ LVGL_Example_Grid::LVGL_Example_Grid(SPIDisplay *spi_disp,
                                      lv_display_flush_cb_t fcallback,
                                      lv_tick_get_cb_t tcallback,
                                      const cell board[ROWS][COLUMNS])                               
-    : CS122_App(spi_disp, fcallback, tcallback),board_(board) {}
-
-    // static void LVGL_Example_Grid::DisplayWithShips(const cell board[ROWS][COLUMNS], lv_obj_t * container) {
-    //     for(int row = 0; row < 10; row++) {
-    //         for(int col = 0; col < 10; col++) {
-    //             lv_obj_t * label = lv_label_create(container);
-
-    //             lv_obj_set_style_grid_cell_x_align(label, LV_GRID_ALIGN_STRETCH, 0);
-    //             lv_obj_set_style_grid_cell_column_pos(label, col, 0);
-
-    //             lv_obj_set_style_grid_cell_y_align(label, LV_GRID_ALIGN_STRETCH, 0);
-    //             lv_obj_set_style_grid_cell_row_pos(label, row, 0);
-
-    //             if(board[row][col].value == PLACED) {
-    //                 lv_label_set_text_fmt(label, "P");
-    //                 lv_obj_set_style_bg_color(label, lv_color_hex(0x0000FF), 0);
-    //             }
-    //             else if(board[row][col].value == HIT) {
-    //                 lv_label_set_text_fmt(label, "H");
-    //                 lv_obj_set_style_bg_color(label, lv_color_hex(0xFF0000), 0);
-    //             }
-    //             else if(board[row][col].value == MISS) {
-    //                 lv_label_set_text_fmt(label, "M");
-    //                 lv_obj_set_style_bg_color(label, lv_color_hex(0x00FF00), 0);
-    //             }
-    //             else if(board[row][col].value == EMPTY) {
-    //                 lv_label_set_text_fmt(label, "E");
-    //                 lv_obj_set_style_bg_color(label, lv_color_hex(0x888888), 0);
-    //             }
-    //             else {
-    //                 lv_label_set_text_fmt(label, "");
-    //             }
-                
-    //             lv_obj_set_style_border_color(label, lv_color_hex(0x000000), 0);
-    //             lv_obj_set_style_border_width(label, 1, 0);
-
-    //             lv_obj_set_style_bg_opa(label, LV_OPA_COVER, 0);
-    //         }
-    //     }
-    // }
+    : CS122_App(spi_disp, fcallback, tcallback), board_(board), statusLabel_(nullptr) {}
 
     void LVGL_Example_Grid::createGrid() {
         lv_obj_t * screen = lv_screen_active();
@@ -61,6 +22,12 @@ LVGL_Example_Grid::LVGL_Example_Grid(SPIDisplay *spi_disp,
         lv_obj_set_style_border_width(screen, 0, 0);
         lv_obj_set_style_margin_all(screen, 0, 0);
         lv_obj_set_scrollbar_mode(screen, LV_SCROLLBAR_MODE_OFF);
+
+        statusLabel_ = lv_label_create(screen);
+        lv_obj_set_pos(statusLabel_, 286, 10);
+        lv_obj_set_width(statusLabel_, 180);
+        lv_obj_set_style_text_color(statusLabel_, lv_color_hex(0xFFFFFF), 0);
+        lv_obj_set_style_text_font(statusLabel_, &lv_font_montserrat_18, 0);
 
         /* Main grid container with fixed descriptors */
         lv_obj_t * container = lv_obj_create(screen);
@@ -90,7 +57,7 @@ LVGL_Example_Grid::LVGL_Example_Grid(SPIDisplay *spi_disp,
                 lv_obj_set_style_grid_cell_y_align(cell_obj, LV_GRID_ALIGN_STRETCH, 0);
                 lv_obj_set_style_grid_cell_row_pos(cell_obj, row, 0);
 
-                lv_obj_set_style_bg_color(cell_obj, lv_color_hex(0xFFFFFF), 0);
+                lv_obj_set_style_bg_color(cell_obj, lv_color_hex(0x0B4F8A), 0);
                 lv_obj_set_style_border_color(cell_obj, lv_color_hex(0x000000), 0);
                 lv_obj_set_style_border_width(cell_obj, 1, 0);
                 lv_obj_set_style_bg_opa(cell_obj, LV_OPA_COVER, 0);
@@ -98,21 +65,22 @@ LVGL_Example_Grid::LVGL_Example_Grid(SPIDisplay *spi_disp,
         }
     }
 
-    void LVGL_Example_Grid::renderBoard(const cell board[ROWS][COLUMNS], bool hideShips) {
+    void LVGL_Example_Grid::renderBoard(const cell board[ROWS][COLUMNS], ViewMode viewMode) {
         for(int row = 0; row < ROWS; row++) {
             for(int col = 0; col < COLUMNS; col++) {
                 lv_obj_t * cell_obj = cells_[row][col];
 
-                uint32_t color = 0x0000FF;
+                uint32_t color = 0x0B4F8A;
+                cellValue value = board[row][col].value;
 
-                if (!hideShips && board[row][col].value == PLACED) {
-                    color = 0xFF0000;
+                if (value == PLACED && viewMode == ViewMode::Placement) {
+                    color = 0x6F7D8C;
                 }
-                if (board[row][col].value == HIT) {
-                    color = 0xFF0000;
+                else if (value == HIT) {
+                    color = 0xD62828;
                 }
-                else if (board[row][col].value == MISS) {
-                    color = 0x00FF00;
+                else if (value == MISS) {
+                    color = 0xE9EEF2;
                 }
 
                 lv_obj_set_style_bg_color(cell_obj, lv_color_hex(color), 0);
@@ -129,15 +97,27 @@ LVGL_Example_Grid::LVGL_Example_Grid(SPIDisplay *spi_disp,
         }
     }   
 
-    void LVGL_Example_Grid::DisplayWithShips(const cell board[ROWS][COLUMNS]) {
+    void LVGL_Example_Grid::renderStatus() {
+        if(statusLabel_ == nullptr) {
+            return;
+        }
+
+        lv_label_set_text_fmt(statusLabel_, "P%d\n%s",
+                              player_ ? 2 : 1,
+                              viewMode_ == ViewMode::Placement ? "PLACE" : "ATTACK");
+    }
+
+    void LVGL_Example_Grid::DisplayPlacements(const cell board[ROWS][COLUMNS], bool player) {
         board_ = board;
-        hideShips_ = false;
+        viewMode_ = ViewMode::Placement;
+        player_ = player;
         redraw_pending_ = true;
     }
 
-    void LVGL_Example_Grid::DisplayWithoutShips(const cell board[ROWS][COLUMNS]) {
+    void LVGL_Example_Grid::DisplayAttacks(const cell board[ROWS][COLUMNS], bool player) {
         board_ = board;
-        hideShips_ = true;
+        viewMode_ = ViewMode::Attack;
+        player_ = player;
         redraw_pending_ = true;
     }
 
@@ -154,12 +134,14 @@ LVGL_Example_Grid::LVGL_Example_Grid(SPIDisplay *spi_disp,
         }
 
         redraw_pending_ = false;
-        renderBoard(board_, hideShips_);
+        renderStatus();
+        renderBoard(board_, viewMode_);
     }
 
     uint32_t LVGL_Example_Grid::run() {
         createGrid();
-        renderBoard(board_, false);
+        renderStatus();
+        renderBoard(board_, viewMode_);
 
         lv_timer_create(redrawTimerCallback, 10, this);
 

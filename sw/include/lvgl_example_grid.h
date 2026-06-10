@@ -14,22 +14,26 @@ namespace ucr { namespace bcoe { namespace cs { namespace cs122 {
 
         uint32_t run() override;
 
-        void DisplayWithShips(const cell board[ROWS][COLUMNS]);
-        void DisplayWithoutShips(const cell board[ROWS][COLUMNS]);
+        void DisplayPlacements(const cell board[ROWS][COLUMNS], bool player);
+        void DisplayAttacks(const cell board[ROWS][COLUMNS], bool player);
 
     private:
+        enum class ViewMode { Placement, Attack };
+
         const cell (*board_)[COLUMNS];
         lv_obj_t *cells_[ROWS][COLUMNS];
+        lv_obj_t *statusLabel_;
 
-        bool hideShips_ = false;
+        ViewMode viewMode_ = ViewMode::Placement;
+        bool player_ = false;
         volatile bool redraw_pending_ = false;
 
         static void redrawTimerCallback(lv_timer_t *timer);
         void applyPendingRender();
 
         void createGrid();
-        void renderBoard(const cell board[ROWS][COLUMNS], bool hideShips);
+        void renderBoard(const cell board[ROWS][COLUMNS], ViewMode viewMode);
+        void renderStatus();
     };
 }}}}
 #endif
-

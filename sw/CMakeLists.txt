@@ -23,7 +23,7 @@ add_executable(cs122_demo
 pico_enable_stdio_usb(cs122_demo 1)
 
 # pull in common dependencies and additional spi hardware support
-target_link_libraries(cs122_demo pico_stdlib hardware_spi hardware_adc pico_cyw43_arch_none lvgl::lvgl)
+target_link_libraries(cs122_demo pico_stdlib hardware_spi hardware_adc pico_cyw43_arch_lwip_poll lvgl::lvgl)
 
 # create map/bin/hex file etc.
 pico_add_extra_outputs(cs122_demo)

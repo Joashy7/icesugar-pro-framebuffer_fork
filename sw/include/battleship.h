@@ -11,18 +11,34 @@
 
 
 enum directions{REST, UP, DOWN, LEFT, RIGHT} direction;
-enum modeStates {MODE_START, WAIT, PUSH, POSITION, PLAY} modeState;
+enum modeStates {MODE_START, WAIT, PUSH, POSITION, WAIT_FOR_OTHER, PLAY} modeState;
 enum placeStates {PLACE_START, PLACE_IDLE, PLACE_MOVE, ROTATE, PLACE, READY} placeState;
-enum playStates {PLAY_START, PLAY_IDLE, PLAY_MOVE, ATTACK, WON} playState;
+enum playStates {PLAY_START, PLAY_IDLE, PLAY_MOVE, ATTACK, WON, LOST} playState;
+
+#ifndef MY_PLAYER
+#define MY_PLAYER 0
+#endif
 
 cell playerBoard[2][ROWS][COLUMNS] = {};
 
 const int OFFSETS[5] = {4, 3, 2, 2, 1};
 int x = 0, y = 0, xOffset = 0, yOffset = OFFSETS[0], playerIndex[2] = {0, 0};
 unsigned int VRx, VRy;
-bool player = 0, rotate, place;
+bool player = MY_PLAYER, rotate, place;
 bool displayDirty = true;
 bool debugInput = true;
+bool networkGame = true;
+bool myTurn = (MY_PLAYER == 0);
+bool iAmReady = false;
+bool theyAreReady = false;
+int myHits = 0;
+int theirHits = 0;
+int shipCellCount = 0;
+
+void DisplayPlacements(bool boardIndex);
+void DisplayAttacks(bool boardIndex);
+void SendReady();
+void SendAttack();
 
 void RequestDisplayUpdate() {
     displayDirty = true;
@@ -36,6 +52,14 @@ bool ConsumeDisplayUpdate() {
 
 int ShipCount() {
     return sizeof(OFFSETS)/sizeof(OFFSETS[0]);
+}
+
+int TotalShipCellCount() {
+    int total = 0;
+    for (int i = 0; i < ShipCount(); i++) {
+        total += OFFSETS[i] + 1;
+    }
+    return total;
 }
 
 bool ShipsRemaining(bool boardIndex) {
@@ -152,6 +176,7 @@ void SetCell() {
     for (int i = 0; i <= xOffset; i++) {
         for (int j = 0; j <= yOffset; j++) {
             playerBoard[player][y + j][x + i].value = PLACED;
+            playerBoard[player][y + j][x + i].id = playerIndex[player] + 1;
         }
     }
 
@@ -173,11 +198,9 @@ void Attack() {
 
     if (playerBoard[target][y][x].value == EMPTY) {
         playerBoard[target][y][x].value = MISS;
-        gpio_put(18, 0);
     }
     else if (playerBoard[target][y][x].value == PLACED) {
         playerBoard[target][y][x].value = HIT;
-        gpio_put(18, 1);
     }
 
     ClearCursor(target);
