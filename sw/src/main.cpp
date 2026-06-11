@@ -73,6 +73,22 @@ void DisplayAttacks(bool boardIndex) {
     app->DisplayAttacks(playerBoard[boardIndex], player);
 }
 
+void DisplayDefense(bool boardIndex) {
+    app->DisplayDefense(playerBoard[boardIndex], boardIndex);
+}
+
+void DisplayWin() {
+    app->DisplayWin(MY_PLAYER);
+}
+
+void DisplayLose() {
+    app->DisplayLose(MY_PLAYER);
+}
+
+void SetShipSunk(bool player, int shipId, bool sunk) {
+    app->SetShipSunk(player, shipId, sunk);
+}
+
 static void SendMessage(const char *msg) {
     if (client_pcb == nullptr) {
         printf("No TCP client, dropping message: %s", msg);
@@ -96,7 +112,6 @@ void SendAttack() {
 
     if (playerBoard[target][y][x].value == HIT ||
         playerBoard[target][y][x].value == MISS) {
-        ClearCursor(target);
         return;
     }
 
@@ -108,23 +123,38 @@ void SendAttack() {
     playState = ATTACK;
 }
 
-static void WhichShipsSunk() {
-    for (int id = 1; id <= ShipCount(); id++) {
-        int total = OFFSETS[id - 1] + 1;
-        int hits = 0;
-
-        for (int row = 0; row < ROWS; row++) {
-            for (int col = 0; col < COLUMNS; col++) {
-                if (playerBoard[!MY_PLAYER][row][col].id == id &&
-                    playerBoard[!MY_PLAYER][row][col].value == HIT) {
-                    hits++;
-                }
+static int CountShipHits(bool boardIndex, int shipId) {
+    int hits = 0;
+    for (int row = 0; row < ROWS; row++) {
+        for (int col = 0; col < COLUMNS; col++) {
+            if (playerBoard[boardIndex][row][col].id == shipId &&
+                playerBoard[boardIndex][row][col].value == HIT) {
+                hits++;
             }
         }
+    }
 
-        if (hits >= total) {
-            printf("Ship #%d has sunk!\n", id);
-        }
+    return hits;
+}
+
+static bool IsShipSunk(bool boardIndex, int shipId) {
+    if (shipId < 1 || shipId > ShipCount()) {
+        return false;
+    }
+
+    return CountShipHits(boardIndex, shipId) >= OFFSETS[shipId - 1] + 1;
+}
+
+static void MarkShipSunkIfNeeded(bool boardIndex, int shipId) {
+    if (shipId < 1 || shipId > ShipCount()) {
+        return;
+    }
+
+    int shipIndex = shipId - 1;
+    if (!sunkShips[boardIndex][shipIndex] && IsShipSunk(boardIndex, shipId)) {
+        sunkShips[boardIndex][shipIndex] = true;
+        SetShipSunk(boardIndex, shipId, true);
+        printf("Player %d ship #%d has sunk!\n", boardIndex ? 2 : 1, shipId);
     }
 }
 
@@ -141,6 +171,7 @@ static void HandleIncomingAttack(int ax, int ay) {
         target->value = HIT;
         myHits++;
         snprintf(msg, sizeof(msg), "HIT:%d,%d,%d\n", ax, ay, target->id);
+        MarkShipSunkIfNeeded(MY_PLAYER, target->id);
     } else {
         target->value = MISS;
         snprintf(msg, sizeof(msg), "MISS:%d,%d\n", ax, ay);
@@ -152,6 +183,7 @@ static void HandleIncomingAttack(int ax, int ay) {
     if (myHits >= shipCellCount) {
         SendMessage("WIN\n");
         playState = LOST;
+        printf("Lose\n");
         RequestDisplayUpdate();
     }
 }
@@ -172,12 +204,20 @@ static void HandleAttackResult(bool isHit, int ax, int ay, int id) {
 
     if (isHit) {
         theirHits++;
-        WhichShipsSunk();
+        MarkShipSunkIfNeeded(!MY_PLAYER, id);
         if (theirHits >= shipCellCount) {
+            SendMessage("LOSE\n");
             playState = WON;
+            printf("Win\n");
             RequestDisplayUpdate();
             return;
         }
+
+        myTurn = true;
+        playState = PLAY_IDLE;
+        MoveCursor(!MY_PLAYER);
+        RequestDisplayUpdate();
+        return;
     }
 
     SendMessage("NEXT\n");
@@ -210,6 +250,11 @@ static void ParseMessage(char *buf) {
         HandleAttackResult(false, ax, ay, 0);
     } else if (strcmp(buf, "WIN") == 0) {
         playState = WON;
+        printf("Win\n");
+        RequestDisplayUpdate();
+    } else if (strcmp(buf, "LOSE") == 0) {
+        playState = LOST;
+        printf("Lose\n");
         RequestDisplayUpdate();
     } else if (strcmp(buf, "NEXT") == 0) {
         myTurn = true;
@@ -304,7 +349,15 @@ void DisplayCurrentState() {
             DisplayPlacements(MY_PLAYER);
             break;
         case PLAY:
-            DisplayAttacks(!MY_PLAYER);
+            if (playState == WON) {
+                DisplayWin();
+            } else if (playState == LOST) {
+                DisplayLose();
+            } else if (myTurn || playState == ATTACK) {
+                DisplayAttacks(!MY_PLAYER);
+            } else {
+                DisplayDefense(MY_PLAYER);
+            }
             break;
         default:
             DisplayPlacements(MY_PLAYER);
@@ -369,27 +422,20 @@ void Tick() {
                     if (!place) placeState = PLACE_IDLE;
                     break;
                 case READY:
-                    if (networkGame) {
-                        if (!iAmReady) {
-                            iAmReady = true;
-                            SendReady();
-                            printf("I am ready. Waiting for opponent...\n");
-                        }
-
-                        if (theyAreReady) {
-                            modeState = PLAY;
-                            playState = PLAY_START;
-                            printf("Both ready, starting game. myTurn=%d\n", myTurn);
-                        } else {
-                            modeState = WAIT_FOR_OTHER;
-                        }
-                        RequestDisplayUpdate();
-                    } else {
-                        player = 0;
-                        modeState = PLAY;
-                        MoveCursor(!player);
-                        RequestDisplayUpdate();
+                    if (!iAmReady) {
+                        iAmReady = true;
+                        SendReady();
+                        printf("I am ready. Waiting for opponent...\n");
                     }
+
+                    if (theyAreReady) {
+                        modeState = PLAY;
+                        playState = PLAY_START;
+                        printf("Both ready, starting game. myTurn=%d\n", myTurn);
+                    } else {
+                        modeState = WAIT_FOR_OTHER;
+                    }
+                    RequestDisplayUpdate();
                     break;
                 default:
                     placeState = PLACE_START;
@@ -414,7 +460,7 @@ void Tick() {
                     playState = PLAY_IDLE;
                     break;
                 case PLAY_IDLE:
-                    if (networkGame && !myTurn) {
+                    if (!myTurn) {
                         break;
                     }
 
@@ -424,19 +470,7 @@ void Tick() {
                         playState = PLAY_MOVE;
                         MoveCursor(!MY_PLAYER);
                     } else if (!direction && place) {
-                        if (networkGame) {
-                            SendAttack();
-                        } else {
-                            int target = !player;
-                            Attack();
-
-                            if (CheckForWinner(target)) {
-                                playState = WON;
-                            } else {
-                                playState = ATTACK;
-                                player = !player;
-                            }
-                        }
+                        SendAttack();
                     }
                     break;
                 case PLAY_MOVE:
@@ -444,13 +478,6 @@ void Tick() {
                     if (!direction) playState = PLAY_IDLE;
                     break;
                 case ATTACK:
-                    if (!networkGame) {
-                        GetPress();
-                        if (!place) {
-                            MoveCursor(!player);
-                            playState = PLAY_IDLE;
-                        }
-                    }
                     break;
                 case WON:
                     break;

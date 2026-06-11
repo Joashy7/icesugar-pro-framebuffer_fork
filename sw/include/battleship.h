@@ -27,16 +27,20 @@ unsigned int VRx, VRy;
 bool player = MY_PLAYER, rotate, place;
 bool displayDirty = true;
 bool debugInput = true;
-bool networkGame = true;
 bool myTurn = (MY_PLAYER == 0);
 bool iAmReady = false;
 bool theyAreReady = false;
 int myHits = 0;
 int theirHits = 0;
 int shipCellCount = 0;
+bool sunkShips[2][5] = {};
 
 void DisplayPlacements(bool boardIndex);
 void DisplayAttacks(bool boardIndex);
+void DisplayDefense(bool boardIndex);
+void DisplayWin();
+void DisplayLose();
+void SetShipSunk(bool player, int shipId, bool sunk);
 void SendReady();
 void SendAttack();
 
@@ -75,6 +79,10 @@ void LoadCurrentShipSize(bool boardIndex) {
 
     xOffset = 0;
     yOffset = OFFSETS[playerIndex[boardIndex]];
+
+    if (y + yOffset > ROWS - 1) {
+        y = ROWS - 1 - yOffset;
+    }
 }
 
 bool GetDirections() {
@@ -128,7 +136,6 @@ void ClearCursor(bool boardIndex) {
             playerBoard[boardIndex][row][col].cursor = false;
         }
     }
-    x = 0; y = 0;
     RequestDisplayUpdate();
 }
 
@@ -186,34 +193,6 @@ void SetCell() {
     LoadCurrentShipSize(player);
 
     RequestDisplayUpdate();
-}
-
-void Attack() {
-    int target = !player;
-
-    if (playerBoard[target][y][x].value == HIT || playerBoard[target][y][x].value == MISS) {
-        ClearCursor(target);
-        return;
-    }
-
-    if (playerBoard[target][y][x].value == EMPTY) {
-        playerBoard[target][y][x].value = MISS;
-    }
-    else if (playerBoard[target][y][x].value == PLACED) {
-        playerBoard[target][y][x].value = HIT;
-    }
-
-    ClearCursor(target);
-}
-
-bool CheckForWinner(int boardIndex) {
-    for (int i = 0; i < ROWS; i++) {
-        for (int j = 0; j < COLUMNS; j++) {
-            if (playerBoard[boardIndex][i][j].value == PLACED) return false;
-        }
-    }
-
-    return true;
 }
 
 void RotateShip() {
